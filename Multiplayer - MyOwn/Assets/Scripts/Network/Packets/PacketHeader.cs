@@ -5,10 +5,11 @@ using System.IO;
 
 public class PacketHeader : ISerializable
 {
-    public ushort packetType { get; set; }
-    public uint objectId;
     public uint id;
     public uint senderId;
+    public uint objectId;
+    public ushort packetType { get; set; }
+    public bool reliable = false;
 
     public void Serialize(Stream stream)
     {
@@ -18,6 +19,7 @@ public class PacketHeader : ISerializable
         br.Write(senderId);
         br.Write(objectId);
         br.Write(packetType);
+        br.Write(reliable);
     }
 
     public void Deserialize(Stream stream)
@@ -28,5 +30,6 @@ public class PacketHeader : ISerializable
         senderId = br.ReadUInt32();
         objectId = br.ReadUInt32();
         packetType = br.ReadUInt16();
+        reliable = br.ReadBoolean();
     }
 }

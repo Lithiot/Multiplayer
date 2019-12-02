@@ -46,7 +46,7 @@ public class InteractScript : MonoBehaviour
         MessagePacket message = new MessagePacket();
         message.payload = messageField.text;
 
-        PacketManager.instance.SendPacket(message, 0);
+        PacketManager.instance.SendReliablePacket(message, 0);
     }
 
     public void OnReceivePacket(ushort packetType, Stream stream, IPEndPoint ip)

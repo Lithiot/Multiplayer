@@ -5,8 +5,6 @@ using System.Net;
 using System;
 using System.Text;
 
-
-
 public class NetworkManager : MonoBehaviour, IDataReceiver
 {
     public static NetworkManager instance;
@@ -33,8 +31,6 @@ public class NetworkManager : MonoBehaviour, IDataReceiver
 
     private UDPConnection connection;
 
-    
-
     private readonly Dictionary<uint, Client> clients = new Dictionary<uint, Client>();
 
     public void StartServer(int port)
@@ -53,7 +49,12 @@ public class NetworkManager : MonoBehaviour, IDataReceiver
 
         ConnectionManager.instance.SendConnectionRequest();
     }
-    
+
+    public void DisconnectFromServer()
+    {
+        connection = null;
+    }
+
     public void AddClient(Client client)
     {
         clients.Add(client.id, client);
@@ -84,6 +85,14 @@ public class NetworkManager : MonoBehaviour, IDataReceiver
                 connection.Send(data, iterator.Current.Value.ipEndPoint);
             }
         }
+    }
+
+    public IPEndPoint GetClientIpById(uint id)
+    {
+        if (clients.ContainsKey(id))
+            return clients[id].ipEndPoint;
+        else
+            return null;
     }
 
     private void Update()

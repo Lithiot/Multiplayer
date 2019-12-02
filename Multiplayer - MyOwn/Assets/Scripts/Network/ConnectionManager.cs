@@ -107,6 +107,7 @@ public class ConnectionManager : MonoBehaviour
 
     private void CheckResults(Stream stream, IPEndPoint ip)
     {
+        ConnectedAcknowledgePacket packet = new ConnectedAcknowledgePacket();
         ChallengeResponse response = new ChallengeResponse();
         response.Deserialize(stream);
 
@@ -116,6 +117,22 @@ public class ConnectionManager : MonoBehaviour
         if (response.payload == serverResult)
         {
             NetworkManager.instance.AddClient(client);
+            packet.payload = true;
+        }
+        else
+            packet.payload = false;
+
+        PacketManager.instance.SendPacket(packet, 1);
+    }
+
+    private void ReactToConnectionAcknowledge(Stream stream)
+    {
+        ConnectedAcknowledgePacket packet = new ConnectedAcknowledgePacket();
+        packet.Deserialize(stream);
+
+        if (!packet.payload)
+        {
+            NetworkManager.instance.DisconnectFromServer();  
         }
     }
 
@@ -138,10 +155,9 @@ public class ConnectionManager : MonoBehaviour
                     CheckResults(stream, ip);
                 break;
             case NetworkPacketType.Acknowledge:
+                ReactToConnectionAcknowledge(stream);
                 break;
             case NetworkPacketType.Ping:
-                break;
-            default:
                 break;
         }
     }
