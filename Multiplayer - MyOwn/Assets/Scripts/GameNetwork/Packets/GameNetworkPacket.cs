@@ -4,12 +4,11 @@ using UnityEngine;
 
 public enum PacketType
 {
-    HandShake,
-    HandShake_OK,
-    ACK,
-    Error,
-    Ping,
     Message,
+    Transform,
+    Died,
+    Shoot,
+    GameOver
 }
 
 public abstract class GameNetworkPacket<T> : BasePacket<T>

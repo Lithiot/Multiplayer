@@ -28,6 +28,7 @@ public class NetworkManager : MonoBehaviour, IDataReceiver
     public IPAddress IpAddress { get => ipAddress; }
 
     public Action<byte[], IPEndPoint> onReceiveEvent;
+    public Action<uint> onClientConnected;
 
     private UDPConnection connection;
 
@@ -58,6 +59,9 @@ public class NetworkManager : MonoBehaviour, IDataReceiver
     public void AddClient(Client client)
     {
         clients.Add(client.id, client);
+
+        if (onClientConnected != null)
+            onClientConnected.Invoke(client.id);
     }
 
     public void OnReceiveData(byte[] data, IPEndPoint ip)
