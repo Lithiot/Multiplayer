@@ -44,7 +44,7 @@ public class ConnectionManager : MonoBehaviour
     }
 
     private uint clientId = 0;
-    public uint ClientId { get => clientId; }
+    public uint ClientId { get => clientId; private set => clientId = value; }
 
     private Dictionary<uint, Client> unconfirmedClients = new Dictionary<uint, Client>();
     private readonly Dictionary<IPEndPoint, uint> ipToId = new Dictionary<IPEndPoint, uint>();
@@ -69,10 +69,12 @@ public class ConnectionManager : MonoBehaviour
             uint id = clientId;
             ipToId[ip] = id;
 
+            ClientId++;
+
             ulong clientSalt = GenerateRandomLong();
             ulong serverSalt = GenerateRandomLong();
 
-            unconfirmedClients.Add(clientId, new Client(ip, id, clientSalt, serverSalt));
+            unconfirmedClients.Add(id, new Client(ip, id, clientSalt, serverSalt));
         }
 
         ChallengePacket packet = new ChallengePacket();
@@ -117,6 +119,7 @@ public class ConnectionManager : MonoBehaviour
         if (response.payload == serverResult)
         {
             NetworkManager.instance.AddClient(client);
+            unconfirmedClients.Remove(ipToId[ip]);
             packet.payload = true;
         }
         else
@@ -132,8 +135,11 @@ public class ConnectionManager : MonoBehaviour
 
         if (!packet.payload)
         {
-            NetworkManager.instance.DisconnectFromServer();  
+            NetworkManager.instance.DisconnectFromServer();
+            return;
         }
+
+        clientId = packet.clientID;
     }
 
     private void OnRecieveData(ushort type, Stream stream, IPEndPoint ip)

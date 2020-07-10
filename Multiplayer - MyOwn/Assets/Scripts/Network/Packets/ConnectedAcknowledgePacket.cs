@@ -5,6 +5,8 @@ using UnityEngine;
 
 public class ConnectedAcknowledgePacket : BasePacket<bool>
 {
+    public uint clientID;
+
     public ConnectedAcknowledgePacket() : base((ushort)NetworkPacketType.Acknowledge)
     {
     }
@@ -13,11 +15,13 @@ public class ConnectedAcknowledgePacket : BasePacket<bool>
     {
         BinaryWriter bw = new BinaryWriter(stream);
         bw.Write(payload);
+        bw.Write(clientID);
     }
 
     protected override void OnDeserialize(Stream stream)
     {
         BinaryReader br = new BinaryReader(stream);
         payload = br.ReadBoolean();
+        clientID = br.ReadUInt32();
     }
 }

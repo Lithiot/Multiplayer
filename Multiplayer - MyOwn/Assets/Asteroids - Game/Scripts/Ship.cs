@@ -108,7 +108,8 @@ public class Ship : MonoBehaviour
             ShootPacket packet = new ShootPacket();
             packet.payload = new bulletProperties(dir);
 
-            PacketManager.instance.SendPacket(packet, 4);
+            //PacketManager.instance.SendPacket(packet, 4);
+            PacketManager.instance.SendReliablePacket(packet , 4);
         }
     }
 

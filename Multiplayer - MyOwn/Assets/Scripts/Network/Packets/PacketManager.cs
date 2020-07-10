@@ -3,6 +3,8 @@ using UnityEngine;
 using System.Net;
 using System.IO;
 using System;
+using System.Linq;
+using PacketDotNet.Utils;
 
 enum ReliableType
 {
@@ -28,6 +30,9 @@ public class PacketManager : MonoBehaviour, IDataReceiver
     private Dictionary<uint, Action<ushort, Stream, IPEndPoint>> OnPacketReceived = new Dictionary<uint, System.Action<ushort, Stream, IPEndPoint>>();
     private Dictionary<uint, byte[]> packetsAwaitingAcknowledge = new Dictionary<uint, byte[]>();
     private uint constantForBitmasking = 1;
+
+    private Dictionary<uint, Dictionary<uint, byte[]>> reliablePacketsInWait = new Dictionary<uint, Dictionary<uint, byte[]>>();
+    private Dictionary<uint, uint> expectedID = new Dictionary<uint, uint>();
 
     // Server Properties
     private Dictionary<uint, uint> lastAckPerClient = new Dictionary<uint, uint>();
@@ -114,33 +119,130 @@ public class PacketManager : MonoBehaviour, IDataReceiver
 
         header.Serialize(stream);
         packet.Serialize(stream);
-
+        
         stream.Close();
 
-        return stream.ToArray();
+
+        PacketSecurity security = new PacketSecurity();
+        Crc32 crc = new Crc32();
+        MemoryStream packetStream = new MemoryStream();
+
+        byte[] hash = crc.ComputeHash(stream.ToArray());
+
+        security.data = stream.ToArray();
+        security.hash = hash;
+
+        security.Serialize(packetStream);
+        
+        packetStream.Close();
+
+
+        return packetStream.ToArray();
     }
 
     public void OnReceiveData(byte[] data, IPEndPoint ip)
     {
+        PacketSecurity security = new PacketSecurity();
+        Crc32 crc = new Crc32();
+        MemoryStream packetStream = new MemoryStream(data);
+
+        security.Deserialize(packetStream);
+
+        byte[] myHash = crc.ComputeHash(security.data);
+
+        if (!HashCheck(security.hash, myHash)) return;
+
         PacketHeader header = new PacketHeader();
-        MemoryStream stream = new MemoryStream(data);
+        MemoryStream stream = new MemoryStream(security.data);
 
         header.Deserialize(stream);
 
         if (header.reliable)
+            OnRecieveData_Reliable(security.data, header, stream, ip);
+        else
+            OnRecieveData_Unrealiable(header, stream, ip);
+    }
+
+    private bool HashCheck(byte[] packetHash, byte[] myHash) 
+    {
+        if (packetHash.Length != myHash.Length) return false;
+
+        for (int i = 0; i < packetHash.Length; i++) 
         {
-            if (header.packetType == (uint)ReliableType.Acknowledge)
-                ProcessAcknowledgePacket(stream);
-            else if (NetworkManager.instance.IsServer)
-                ProcessReliablePacketAsServer(header);
-            else
-                    ProcessReliablePacketAsClient(header);
+            if (packetHash[i] != myHash[i]) return false; 
         }
 
+        return true;
+    }
+
+    private void OnRecieveData_Reliable(byte[] data, PacketHeader header, MemoryStream stream, IPEndPoint ip) 
+    {
+        if (header.packetType == (uint)ReliableType.Acknowledge)
+            ProcessAcknowledgePacket(stream);
+        else if (NetworkManager.instance.IsServer)
+            ProcessReliablePacketAsServer(header);
+        else
+            ProcessReliablePacketAsClient(header);
+
+        uint senderID = header.senderId;
+
+        // if I didn't know about this client, register it and pass on the packet
+        if (!expectedID.ContainsKey(senderID)) 
+        {
+            expectedID[senderID] = header.id + 1;
+            reliablePacketsInWait[senderID] = new Dictionary<uint , byte[]>();
+
+            if (OnPacketReceived.ContainsKey(header.objectId))
+                OnPacketReceived[header.objectId].Invoke(header.packetType , stream , ip);
+
+            return;
+        }
+
+        // Check if the new packet is the next packet that I was expecting
+        if (expectedID[senderID] == header.id) 
+        {
+            // if it is, pass on the packet and setup the new variables
+            if (OnPacketReceived.ContainsKey(header.objectId))
+                OnPacketReceived[header.objectId].Invoke(header.packetType , stream , ip);
+
+            expectedID[senderID]++;
+
+            CheckPacketsInWait(senderID, ip);
+        }
+        else 
+        {
+            // if it's not, enqueue it and wait for next packet
+            reliablePacketsInWait[senderID][header.id] = data;
+        }
+    }
+
+    private void CheckPacketsInWait(uint senderID, IPEndPoint ip)
+    {
+        // Check if we have the next packet in queue
+        if (reliablePacketsInWait[senderID].Count <= 0)
+            return;
+
+        Dictionary<uint, byte[]> packetsInWait = reliablePacketsInWait[senderID];
+
+        while (packetsInWait.ContainsKey(expectedID[senderID])) 
+        {
+            PacketHeader header = new PacketHeader();
+            MemoryStream stream = new MemoryStream(packetsInWait[expectedID[senderID]]);
+
+            header.Deserialize(stream);
+
+            if (OnPacketReceived.ContainsKey(header.objectId))
+                OnPacketReceived[header.objectId].Invoke(header.packetType , stream , ip);
+
+            packetsInWait.Remove(expectedID[senderID]);
+            expectedID[senderID]++;
+        }
+    }
+
+    private void OnRecieveData_Unrealiable(PacketHeader header, MemoryStream stream, IPEndPoint ip) 
+    {
         if (OnPacketReceived.ContainsKey(header.objectId))
             OnPacketReceived[header.objectId].Invoke(header.packetType, stream, ip);
-
-        stream.Close();
     }
 
     private void ProcessReliablePacketAsServer(PacketHeader header)
