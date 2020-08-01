@@ -8,6 +8,7 @@ public class Bullet : MonoBehaviour
     float speed = 10.0f;
 
     Vector3 direction;
+
     public void Shoot(Vector3 dir)
     {
         direction = dir;
@@ -39,5 +40,14 @@ public class Bullet : MonoBehaviour
     void Destroy()
     {
         Destroy(this.gameObject);
+    }
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (collision.gameObject.CompareTag("Player")) 
+        {
+            collision.gameObject.GetComponent<Ship>().TakeDamage();
+            Destroy();
+        }
     }
 }

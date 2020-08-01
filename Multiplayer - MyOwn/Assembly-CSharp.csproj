@@ -68,6 +68,7 @@
     <Compile Include="Assets\Asteroids - Game\Scripts\GameManager.cs" />
     <Compile Include="Assets\Asteroids - Game\Scripts\Ship.cs" />
     <Compile Include="Assets\Scripts\GameNetwork\Packets\DeathPacket.cs" />
+    <Compile Include="Assets\Scripts\GameNetwork\Packets\GameFinishedPacket.cs" />
     <Compile Include="Assets\Scripts\GameNetwork\Packets\GameNetworkPacket.cs" />
     <Compile Include="Assets\Scripts\GameNetwork\Packets\MessagePacket.cs" />
     <Compile Include="Assets\Scripts\GameNetwork\Packets\ShootPacket.cs" />

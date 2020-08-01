@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
 using System.Net;
+using System;
 
 public class Ship : MonoBehaviour
 {
-    [SerializeField] protected int lives;
+    [SerializeField] private int lives;
     [SerializeField] private float rotSpeed = 120.0f;
     [SerializeField] private float acceleration = 2.5f;
     private Vector3 speed = Vector3.zero;
@@ -15,11 +16,26 @@ public class Ship : MonoBehaviour
     float timer = 0.0f;
 
     [SerializeField] private GameObject bulletPrefab;
+    [SerializeField] private UnityEngine.Transform gunpoint;
 
     private float networkTimer = 0.10f;
     private float auxNetworkTimer;
 
     private bool isOwner;
+
+    public Action<int, Ship> OnChangeLives;
+
+    protected int Lives 
+    { 
+        get => lives;
+        set 
+        {
+            lives = value;
+
+            if (OnChangeLives != null)
+                OnChangeLives.Invoke(lives, this);
+        } 
+    }
 
     public bool GetIsOwner()
     {
@@ -35,11 +51,13 @@ public class Ship : MonoBehaviour
     {
         if(!isOwner)
             PacketManager.instance.AddListener(4, OnReceivePacket);
+
+        GameManager.instance.OnGameOver += GameOver;
     }
 
     public void Reset()
     {
-        lives = 3;
+        Lives = 3;
         this.transform.position = Vector3.zero;
         timer = fireRate;
     }
@@ -100,7 +118,7 @@ public class Ship : MonoBehaviour
 
     void Shoot(Vector3 dir)
     {
-        GameObject go = Instantiate(bulletPrefab, transform.position, transform.rotation);
+        GameObject go = Instantiate(bulletPrefab, gunpoint.position, gunpoint.rotation);
         go.GetComponent<Bullet>().Shoot(dir);
 
         if (isOwner)
@@ -109,23 +127,27 @@ public class Ship : MonoBehaviour
             packet.payload = new bulletProperties(dir);
 
             //PacketManager.instance.SendPacket(packet, 4);
-            PacketManager.instance.SendReliablePacket(packet , 4);
+            PacketManager.instance.SendPacket(packet , 4);
         }
     }
 
     void Die()
     {
-        lives--;
+        Lives--;
         this.transform.position = Vector3.zero;
+    }
 
+    public void TakeDamage() 
+    {
         if (isOwner)
         {
             DeathPacket packet = new DeathPacket();
             packet.payload = true;
 
-            PacketManager.instance.SendReliablePacket(packet, 4);
-        }
+            PacketManager.instance.SendReliablePacket(packet , 4);
 
+            Die();
+        }
     }
 
     public void OnReceivePacket(ushort packetType, Stream stream, IPEndPoint ip)
@@ -161,5 +183,10 @@ public class Ship : MonoBehaviour
         packet.payload = new Transform(transform.position, transform.rotation);
 
         PacketManager.instance.SendPacket(packet, 4);
+    }
+
+    private void GameOver(bool result) 
+    {
+        gameObject.SetActive(false);
     }
 }
